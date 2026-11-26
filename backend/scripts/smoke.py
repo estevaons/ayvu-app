@@ -1,6 +1,6 @@
-"""End-to-end smoke test against the deployed app (storage -> prepare -> GPU TTS -> audio).
+"""End-to-end smoke test against the deployed app (storage -> prepare -> TTS -> audio).
 
-    uv run modal run scripts/smoke.py --user-id <uuid> --epub path/to/book.epub
+    uv run modal run scripts/smoke.py --user-id <uuid> --file path/to/book.epub   # or .pdf/.txt/...
 
 Uses the deployed functions and the `ayvu-supabase` secret; the user must already exist.
 """
@@ -16,18 +16,18 @@ image = modal.Image.debian_slim(python_version="3.12").pip_install("supabase>=2.
 
 
 @app.function(image=image, secrets=[modal.Secret.from_name("ayvu-supabase")], timeout=1800)
-def smoke(user_id: str, epub: bytes) -> dict:
+def smoke(user_id: str, data: bytes, ext: str) -> dict:
     import os
 
     from supabase import create_client
 
     db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
     book_id = str(uuid.uuid4())
-    path = f"{user_id}/{book_id}/source.epub"
-    db.storage.from_("uploads").upload(path, epub, {"content-type": "application/epub+zip"})
+    path = f"{user_id}/{book_id}/source.{ext}"
+    db.storage.from_("uploads").upload(path, data, {"content-type": "application/octet-stream"})
     db.table("books").insert({
         "id": book_id, "user_id": user_id, "title": "smoke", "source_path": path,
-        "source_filename": "smoke.epub", "source_format": "epub", "status": "uploaded",
+        "source_filename": f"smoke.{ext}", "source_format": ext, "status": "uploaded",
     }).execute()
 
     started = time.time()
@@ -48,8 +48,8 @@ def smoke(user_id: str, epub: bytes) -> dict:
 
 
 @app.local_entrypoint()
-def main(user_id: str, epub: str):
-    result = smoke.remote(user_id, Path(epub).read_bytes())
+def main(user_id: str, file: str):
+    result = smoke.remote(user_id, Path(file).read_bytes(), Path(file).suffix.lstrip(".").lower())
     book = result["book"]
     print("RESULT", book["status"], book.get("error_code"), book.get("error_message"))
     for c in result.get("chapters", []):

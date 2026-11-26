@@ -53,7 +53,7 @@ uv run modal deploy app.py
 ```
 Copie a URL do endpoint `api` (`https://<workspace>--ayvu-api.modal.run`) para `NEXT_PUBLIC_API_URL` no `.env.local`.
 
-`npm run modal:deploy` publica em CPU (`AYVU_GPU=cpu`); GPU exige forma de pagamento no Modal (`AYVU_GPU=L4 npm run modal:deploy`). `AYVU_MAX_TTS_WORKERS` (padrão `4`) limita os workers. O domínio web liberado no CORS fica em `backend/app.py`.
+`npm run modal:deploy` publica com GPU (L4, com A10G e T4 de reserva; exige forma de pagamento no Modal); `AYVU_GPU=cpu npm run modal:deploy` roda na CPU. A conta está limitada aos créditos grátis (spend limit US$0, usage limit US$30). `AYVU_MAX_TTS_WORKERS` (padrão `4`) limita os workers. O domínio web liberado no CORS fica em `backend/app.py`.
 
 ### 3. Web
 ```bash

@@ -16,9 +16,12 @@ import time
 import modal
 
 APP_NAME = "ayvu"
-# "L4"/"T4"/... or "cpu". GPUs need a payment method on the Modal account.
-GPU = os.environ.get("AYVU_GPU", "L4")
-TTS_RESOURCES = {"cpu": 8.0, "memory": 8192} if GPU.lower() == "cpu" else {"gpu": GPU}
+# GPUs em ordem de preferência, separadas por vírgula, ou "cpu". GPUs exigem forma de pagamento
+# no Modal. Com uma lista, o Modal usa a próxima quando a anterior está sem capacidade, em vez de
+# deixar os workers esperando ("scheduling") indefinidamente.
+GPU = os.environ.get("AYVU_GPU", "L4,A10G,T4")
+_gpus = [g.strip() for g in GPU.split(",") if g.strip()]
+TTS_RESOURCES = {"cpu": 8.0, "memory": 8192} if GPU.lower() == "cpu" else {"gpu": _gpus if len(_gpus) > 1 else _gpus[0]}
 MAX_TTS_WORKERS = int(os.environ.get("AYVU_MAX_TTS_WORKERS", "4"))
 ACTIVE_BOOK_LIMIT = {"free": 3, "pro": 20}
 
@@ -115,10 +118,19 @@ def dispatch() -> dict:
 
     recovered = reset_stale_chapters(20)
     pending, generating = queue_stats()
-    wanted = max(0, min(pending, MAX_TTS_WORKERS - generating))
+    # Cada worker drena a fila até esvaziar; o alvo é um worker por capítulo, até o limite.
+    # Chamadas já disparadas (na fila do Modal ou rodando) contam, senão o cron empilha uma
+    # chamada nova a cada 3 min enquanto os containers ainda estão subindo.
+    target = min(MAX_TTS_WORKERS, pending + generating)
+    try:
+        stats = TTSWorker().drain.get_current_stats()
+        in_flight = stats.backlog + stats.num_running_inputs
+    except Exception:
+        in_flight = generating
+    wanted = max(0, min(pending, target - in_flight))
     for _ in range(wanted):
         TTSWorker().drain.spawn()
-    return {"recovered": recovered, "pending": pending, "generating": generating, "spawned": wanted}
+    return {"recovered": recovered, "pending": pending, "generating": generating, "in_flight": in_flight, "spawned": wanted}
 
 
 # ---------------------------------------------------------------------------
