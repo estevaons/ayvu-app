@@ -1,0 +1,29 @@
+[project]
+name = "ayvu-backend"
+version = "0.1.0"
+description = "Ayvu workers and API on Modal"
+requires-python = ">=3.12"
+dependencies = [
+  "modal>=1.1",
+  "supabase>=2.15",
+  "fastapi[standard]>=0.115",
+  "pypdf>=5.0",
+  "pypdfium2>=4.30",
+  "pillow>=11.0",
+  "ebooklib>=0.18",
+  "beautifulsoup4>=4.12",
+  "langdetect>=1.0.9",
+  "mobi>=0.3.3",
+  "numpy",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]

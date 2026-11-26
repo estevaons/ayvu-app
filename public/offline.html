@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ayvu • Sem conexão</title>
+  <style>
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+      background: #0f0e0c; color: #f3ede2; font-family: system-ui, sans-serif; text-align: center; }
+    img { width: 80px; height: 80px; margin-bottom: 20px; }
+    h1 { font-size: 20px; margin: 0 0 8px; font-weight: 600; }
+    p { margin: 0 auto 24px; max-width: 320px; color: #a59d8f; font-size: 15px; line-height: 1.5; }
+    button { min-height: 46px; padding: 0 24px; border: 0; border-radius: 999px;
+      background: #e3b15f; color: #1a1610; font-size: 15px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/icon.svg" alt="" />
+    <h1>Sem conexão</h1>
+    <p>Abra o Ayvu uma vez com internet para ouvir seus livros baixados mesmo offline.</p>
+    <button onclick="location.replace('/')">Tentar de novo</button>
+  </main>
+  <script>
+    // O splash nativo espera o app avisar que tem interface; aqui não há app, então esconde já.
+    window.Capacitor?.Plugins?.SplashScreen?.hide().catch(() => {});
+  </script>
+</body>
+</html>

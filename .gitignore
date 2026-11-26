@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# keep the env template
+!.env.example
+
+# Python backend
+backend/.venv/
+__pycache__/
+
+# APKs gerados
+*.apk
