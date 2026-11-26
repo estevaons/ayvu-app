@@ -137,11 +137,15 @@ def api():
     from ayvu.language import SUPPORTED_LANGUAGES, VOICES
 
     web = FastAPI(title="Ayvu API")
-    extra_origins = [o.strip() for o in os.environ.get("AYVU_WEB_ORIGINS", "").split(",") if o.strip()]
+    # Este código roda dentro do container do Modal, onde variáveis do shell do deploy não chegam:
+    # o domínio de produção fica aqui. AYVU_WEB_ORIGINS só serve se vier de um Secret.
+    web_origins = os.environ.get("AYVU_WEB_ORIGINS", "https://ayvu-app.vercel.app")
+    extra_origins = [o.strip() for o in web_origins.split(",") if o.strip()]
     web.add_middleware(
         CORSMiddleware,
         allow_origins=["capacitor://localhost", "https://localhost", "http://localhost", *extra_origins],
-        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+        # Dev local e previews da Vercel deste projeto.
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://ayvu-[a-z0-9-]+-estevaons-projects-a4b58db2\.vercel\.app",
         allow_methods=["*"],
         allow_headers=["*"],
     )

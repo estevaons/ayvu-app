@@ -3,7 +3,8 @@
 const CACHE = "ayvu-v1";
 
 // Caminhos estáveis, sem hash no nome. Uma falha aqui não pode derrubar a instalação.
-const ROUTES = ["/", "/library/", "/book/", "/add/", "/settings/", "/login/", "/offline.html", "/icon.svg"];
+// Na Vercel a página offline responde em /offline/ (sem .html); no next dev, em /offline.html.
+const ROUTES = ["/", "/library/", "/book/", "/add/", "/settings/", "/login/", "/offline/", "/offline.html", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
@@ -61,7 +62,7 @@ self.addEventListener("fetch", (event) => {
       const hit = await cache.match(request, { ignoreSearch: true });
       if (hit) return hit;
       return request.mode === "navigate"
-        ? (await cache.match("/offline.html")) || Response.error()
+        ? (await cache.match("/offline/")) || (await cache.match("/offline.html")) || Response.error()
         : Response.error();
     }
   })());

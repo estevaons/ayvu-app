@@ -11,7 +11,7 @@
     "cap:sync": "next build && cap sync",
     "android": "next build && cap sync android && cap open android",
     "android:run": "next build && cap sync android && cap run android",
-    "modal:deploy": "cd backend && AYVU_GPU=${AYVU_GPU:-cpu} AYVU_WEB_ORIGINS=${AYVU_WEB_ORIGINS:-https://ayvu-app.vercel.app} uv run modal deploy app.py",
+    "modal:deploy": "cd backend && AYVU_GPU=${AYVU_GPU:-cpu} uv run modal deploy app.py",
     "android:apk": "next build && cap sync android && cd android && ./gradlew assembleDebug -q && cp app/build/outputs/apk/debug/app-debug.apk ../ayvu-debug.apk && echo 'APK: ayvu-debug.apk'"
   },
   "dependencies": {

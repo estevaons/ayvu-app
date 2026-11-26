@@ -53,7 +53,7 @@ uv run modal deploy app.py
 ```
 Copie a URL do endpoint `api` (`https://<workspace>--ayvu-api.modal.run`) para `NEXT_PUBLIC_API_URL` no `.env.local`.
 
-Variáveis opcionais no deploy: `AYVU_GPU` (padrão `L4`), `AYVU_MAX_TTS_WORKERS` (padrão `4`), `AYVU_WEB_ORIGINS` (origens CORS extras, separadas por vírgula).
+`npm run modal:deploy` publica em CPU (`AYVU_GPU=cpu`); GPU exige forma de pagamento no Modal (`AYVU_GPU=L4 npm run modal:deploy`). `AYVU_MAX_TTS_WORKERS` (padrão `4`) limita os workers. O domínio web liberado no CORS fica em `backend/app.py`.
 
 ### 3. Web
 ```bash
@@ -62,10 +62,17 @@ npm run dev          # http://localhost:3000
 npm run build        # gera out/ (estático)
 ```
 
-### 4. Android
+### 4. Vercel
+Importe o repositório como projeto Next.js (*Import single project* no app, não *Services*: o backend roda no Modal).
+As variáveis públicas vêm do `.env.production`. Cada push na `main` publica o site, e o APK já abre a versão nova.
+
+### 5. Android
 ```bash
-npm run android      # build + cap sync + abre no Android Studio
+npm run android:apk  # gera ayvu-debug.apk apontando para https://ayvu-app.vercel.app
+APP_SITE_URL=https://outro-dominio npm run android:apk
+npm run android      # abre no Android Studio
 ```
+O APK carrega o site publicado (`server.url` em `capacitor.config.ts`), então só precisa ser refeito ao trocar de domínio, plugin nativo, ícone ou splash.
 iOS: `npx cap add ios` em um Mac e adicione `audio` em *Background Modes*.
 
 ## Testes
