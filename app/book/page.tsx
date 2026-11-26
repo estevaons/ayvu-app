@@ -143,13 +143,13 @@ function BookDetail() {
       </div>
 
       {/* Hero */}
-      <section className="flex flex-col items-center gap-6 pt-2 pb-8 text-center sm:flex-row sm:items-end sm:text-left">
-        <Cover title={book.title} author={book.author} coverPath={book.cover_path} size="lg" className="w-44 shrink-0 sm:w-48" />
+      <section className="flex flex-col items-center gap-5 pt-1 pb-6 text-center sm:flex-row sm:items-end sm:gap-6 sm:pt-2 sm:pb-8 sm:text-left">
+        <Cover title={book.title} author={book.author} coverPath={book.cover_path} size="lg" className="w-[clamp(112px,calc((100dvh_-_430px)/1.5),176px)] shrink-0 sm:w-48" />
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex justify-center sm:justify-start">
             <StatusPill status={book.status} done={book.completed_chapters} total={book.total_chapters} />
           </div>
-          <h1 className="font-serif text-3xl leading-tight tracking-tight sm:text-4xl">{book.title}</h1>
+          <h1 className="font-serif text-[26px] leading-tight tracking-tight sm:text-4xl">{book.title}</h1>
           {book.author && <p className="mt-1.5 text-muted">{book.author}</p>}
           <dl className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-muted sm:justify-start">
             {book.total_chapters > 0 && <div>{t("book.chaptersCount", { count: book.total_chapters })}</div>}
@@ -165,10 +165,10 @@ function BookDetail() {
         </div>
       </section>
 
-      {/* Primary actions */}
-      <div className="flex flex-wrap gap-3">
+      {/* Primary actions: empilhadas e com a largura toda no celular, lado a lado a partir de sm. */}
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
-          className="btn-primary h-12 flex-1 sm:flex-none sm:px-8"
+          className="btn-primary h-12 sm:px-8"
           disabled={ready.length === 0}
           onClick={() => (isCurrent ? player.toggle() : void player.playBook(book.id))}
         >
@@ -176,7 +176,7 @@ function BookDetail() {
           {isCurrent && player.playing ? t("player.pause") : saved ? t("book.resume") : t("book.play")}
         </button>
         {ready.length > 0 && (
-          <button className="btn-secondary h-12" onClick={onDownload} disabled={!!download}>
+          <button className="btn-secondary h-12 sm:px-6" onClick={onDownload} disabled={!!download}>
             {download ? (
               <>
                 <Spinner className="size-4" /> {t("book.downloading", download)}

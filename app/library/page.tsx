@@ -100,29 +100,29 @@ function ContinueCard({ book, progress }: { book: Book; progress?: ListeningProg
   const remaining = book.total_duration_seconds * (1 - listenedFraction(book, progress));
 
   return (
-    <div className="card relative flex items-center gap-4 overflow-hidden p-4">
+    <div className="card relative flex items-center gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4">
       <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-[radial-gradient(closest-side,var(--accent-soft),transparent)]" />
-      <Link href={`/book/?id=${book.id}`} className="w-20 shrink-0">
+      <Link href={`/book/?id=${book.id}`} className="w-16 shrink-0 sm:w-20">
         <Cover title={book.title} author={book.author} coverPath={book.cover_path} size="sm" />
       </Link>
       <div className="relative min-w-0 flex-1">
         <Link href={`/book/?id=${book.id}`}>
-          <h3 className="line-clamp-2 font-serif text-lg leading-snug">{book.title}</h3>
+          <h3 className="line-clamp-2 font-serif text-base leading-snug sm:text-lg">{book.title}</h3>
         </Link>
-        <p className="mt-1 truncate text-sm text-muted">
+        <p className="mt-0.5 truncate text-[13px] text-muted sm:text-sm">
           {chapterIndex ? t("library.chapterOf", { index: chapterIndex, total: book.total_chapters }) : book.author}
         </p>
-        <ProgressBar value={listenedFraction(book, progress)} className="mt-3" />
+        <ProgressBar value={listenedFraction(book, progress)} className="mt-2.5" />
         {book.status === "completed" && remaining > 60 && (
-          <p className="mt-1.5 text-xs text-faint">{t("library.left", { time: humanDuration(remaining) })}</p>
+          <p className="mt-1.5 truncate text-xs text-faint">{t("library.left", { time: humanDuration(remaining) })}</p>
         )}
       </div>
       <button
-        className="relative grid size-14 shrink-0 place-items-center rounded-full bg-accent text-accent-ink shadow-soft transition active:scale-95"
+        className="relative grid size-12 shrink-0 place-items-center rounded-full bg-accent text-accent-ink shadow-soft transition active:scale-95 sm:size-14"
         onClick={() => (isCurrent ? player.toggle() : void player.playBook(book.id))}
         aria-label={isCurrent && player.playing ? t("player.pause") : t("book.resume")}
       >
-        {isCurrent && player.playing ? <Pause className="size-6 fill-current" /> : <Play className="ml-0.5 size-6 fill-current" />}
+        {isCurrent && player.playing ? <Pause className="size-5 fill-current sm:size-6" /> : <Play className="ml-0.5 size-5 fill-current sm:size-6" />}
       </button>
     </div>
   );

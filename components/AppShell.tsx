@@ -47,10 +47,11 @@ export function AppShell({ children, hideTabs = false }: { children: React.React
         {children}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 pb-safe">
+      {/* Sem abas, a área segura fica no próprio container; com abas, o fundo da barra cobre até a borda. */}
+      <div className={`fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 ${hideTabs ? "pb-safe" : ""}`}>
         <MiniPlayer />
         {!hideTabs && (
-          <nav className="border-t border-line bg-bg/90 backdrop-blur-xl">
+          <nav className="border-t border-line bg-bg/90 pb-safe backdrop-blur-xl">
             <ul className="mx-auto flex max-w-3xl">
               {TABS.map(({ href, icon: Icon, key }) => {
                 const active = pathname?.startsWith(href.slice(0, -1));
@@ -60,12 +61,15 @@ export function AppShell({ children, hideTabs = false }: { children: React.React
                       href={href}
                       className={`flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition ${active ? "text-accent" : "text-faint hover:text-muted"}`}
                     >
+                      {/* Mesma caixa 28px para todos os ícones, assim os rótulos ficam na mesma linha. */}
                       {href === "/add/" ? (
                         <span className={`grid size-7 place-items-center rounded-full ${active ? "bg-accent text-accent-ink" : "bg-elevated text-ink"}`}>
                           <Icon className="size-4.5" strokeWidth={2.4} />
                         </span>
                       ) : (
-                        <Icon className="size-6" strokeWidth={active ? 2.2 : 1.8} />
+                        <span className="grid size-7 place-items-center">
+                          <Icon className="size-6" strokeWidth={active ? 2.2 : 1.8} />
+                        </span>
                       )}
                       {t(key)}
                     </Link>

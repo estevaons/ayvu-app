@@ -53,6 +53,12 @@ export const api = {
   deleteBook: (id: string) => call<void>("DELETE", `/books/${id}`),
 };
 
+/** Best effort: drop an upload whose book was never created, so it doesn't linger in Storage. */
+export async function removeUpload(path: string): Promise<void> {
+  const { error } = await supabase().storage.from("uploads").remove([path]);
+  if (error) console.warn("[ayvu] could not remove orphaned upload", error);
+}
+
 /** Upload straight to Supabase Storage with real progress (supabase-js has no progress events). */
 export async function uploadSource(
   file: File,

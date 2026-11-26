@@ -29,11 +29,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children, stack = false }: { label: string; children: React.ReactNode; stack?: boolean }) {
+  // Rótulo à esquerda quebrando em linhas e controle sempre à direita. Controles largos (stack)
+  // descem para uma linha própria no celular, ocupando a largura toda, em vez de estourar.
   return (
-    <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 px-4 py-3">
-      <span className="text-[15px]">{label}</span>
-      {children}
+    <div className={`flex min-h-14 gap-3 px-4 py-3 ${stack ? "flex-col sm:flex-row sm:items-center" : "items-center"}`}>
+      <span className="min-w-0 flex-1 text-[15px] leading-snug">{label}</span>
+      <div className={`flex min-w-0 [&>*]:min-w-0 ${stack ? "w-full sm:w-auto sm:justify-end" : "max-w-[60%] shrink-0 justify-end"}`}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -48,12 +52,12 @@ function Segmented<T extends string | number>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-full bg-elevated p-1">
+    <div className="flex w-full rounded-full bg-elevated p-1 sm:w-auto">
       {options.map((o) => (
         <button
           key={String(o.value)}
           onClick={() => onChange(o.value)}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition ${
+          className={`inline-flex h-8 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition sm:flex-none ${
             o.value === value ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"
           }`}
         >
@@ -109,7 +113,7 @@ function Settings() {
         </Section>
 
         <Section title={t("settings.appearance")}>
-          <Row label={t("settings.theme")}>
+          <Row label={t("settings.theme")} stack>
             <Segmented<Theme>
               value={prefs.theme}
               onChange={(theme) => prefs.set({ theme })}
@@ -120,7 +124,7 @@ function Settings() {
               ]}
             />
           </Row>
-          <Row label={t("settings.language")}>
+          <Row label={t("settings.language")} stack>
             <Segmented<Locale>
               value={prefs.locale}
               onChange={(locale) => prefs.set({ locale })}

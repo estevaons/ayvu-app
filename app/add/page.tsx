@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { useToast } from "@/components/Toaster";
 import { ProgressBar, Spinner } from "@/components/ui";
-import { ApiError, api, uploadSource } from "@/lib/api";
+import { ApiError, api, removeUpload, uploadSource } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { bytes } from "@/lib/format";
 import { useErrorText, usePrefs } from "@/lib/prefs";
@@ -67,11 +67,13 @@ function AddBook() {
     const bookId = crypto.randomUUID();
     const path = `${user.id}/${bookId}/source.${ext}`;
     abortRef.current = new AbortController();
+    let uploaded = false;
     try {
       setPhase("uploading");
       setProgress(0);
       const typed = file.type ? file : new File([file], file.name, { type: MIME[ext] });
       await uploadSource(typed, path, setProgress, abortRef.current.signal);
+      uploaded = true;
       setPhase("creating");
       const book = await api.createBook({
         source_path: path,
@@ -82,6 +84,10 @@ function AddBook() {
       });
       router.push(`/book/?id=${book.id}`);
     } catch (err) {
+      // A 4xx means the API refused before creating the book, so the upload is safe to drop.
+      // On a network error or 5xx the book may exist already and still needs its file.
+      const refused = err instanceof ApiError && err.status >= 400 && err.status < 500;
+      if (uploaded && refused) void removeUpload(path);
       const code = err instanceof ApiError ? err.code : "generic";
       if (code !== "aborted") {
         console.error("[ayvu] add book failed", err);
@@ -97,8 +103,8 @@ function AddBook() {
   return (
     <>
       <PageHeader title={t("add.title")} />
-      <div className="grid gap-8 animate-fade-up md:grid-cols-[1fr_240px]">
-        <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 gap-8 animate-fade-up md:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="flex min-w-0 flex-col gap-6">
           {/* Drop zone / selected file */}
           {!file ? (
             <button
@@ -114,7 +120,7 @@ function AddBook() {
                 setDragging(false);
                 pick(e.dataTransfer.files?.[0]);
               }}
-              className={`flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-14 text-center transition ${
+              className={`flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-5 py-10 text-center transition sm:px-6 sm:py-14 ${
                 dragging ? "border-accent bg-accent-soft" : "border-line-strong bg-surface hover:border-accent/60"
               }`}
             >
@@ -122,7 +128,8 @@ function AddBook() {
                 <UploadCloud className="size-7" />
               </span>
               <span className="text-lg font-semibold">{t("add.drop")}</span>
-              <span className="text-sm text-muted">{t("add.dropHint")}</span>
+              {/* Arrastar e soltar não existe no celular. */}
+              <span className="text-sm text-muted pointer-coarse:hidden">{t("add.dropHint")}</span>
               <span className="mt-2 text-xs text-faint">{t("add.subtitle")}</span>
             </button>
           ) : (
@@ -230,15 +237,15 @@ function AddBook() {
           <p className="text-center text-xs text-faint">{t("add.drmNote")}</p>
         </div>
 
-        {/* How it works */}
-        <aside className="order-first md:order-none">
-          <ol className="flex gap-3 overflow-x-auto md:flex-col md:gap-5">
+        {/* How it works: no celular vem depois do formulário, que é a ação principal. */}
+        <aside className="min-w-0">
+          <ol className="flex flex-col gap-3 md:gap-5">
             {[
               { icon: BookOpen, text: t("add.how1") },
               { icon: Sparkles, text: t("add.how2") },
               { icon: Headphones, text: t("add.how3") },
             ].map(({ icon: Icon, text }, i) => (
-              <li key={i} className="flex min-w-[200px] items-start gap-3 rounded-2xl bg-surface p-3 md:min-w-0 md:bg-transparent md:p-0">
+              <li key={i} className="flex items-start gap-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-elevated text-accent">
                   <Icon className="size-4.5" />
                 </span>

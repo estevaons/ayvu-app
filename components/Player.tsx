@@ -143,13 +143,15 @@ export function PlayerSheet() {
         </button>
       </header>
 
-      <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-7 px-7">
+      {/* A capa encolhe pela altura disponível (≈440px para o resto do player), para os controles
+          caberem em celulares baixos; se ainda faltar espaço, a área rola em vez de cortar. */}
+      <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col justify-center gap-5 overflow-y-auto px-6 py-3 sm:gap-7 sm:px-7">
         <Cover
           title={p.book.title}
           author={p.book.author}
           coverPath={p.book.cover_path}
           size="lg"
-          className="mx-auto w-[min(68vw,300px)] rounded-2xl"
+          className="mx-auto w-[max(96px,min(68vw,300px,calc((100dvh_-_440px)/1.5)))] shrink-0 rounded-2xl"
         />
 
         <div className="text-center">
