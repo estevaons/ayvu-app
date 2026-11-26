@@ -7,6 +7,7 @@ import logging
 import re
 import subprocess
 import time
+from typing import Callable
 from pathlib import Path
 
 logger = logging.getLogger("ayvu.tts")
@@ -117,6 +118,10 @@ class Mp3Writer:
             pass
 
 
+class NarrationStopped(Exception):
+    """The book was cancelled or deleted while its chapter was being narrated."""
+
+
 class KokoroEngine:
     """One KModel on the GPU, one lightweight KPipeline (G2P) per language."""
 
@@ -137,7 +142,15 @@ class KokoroEngine:
             self._pipelines[lang_code] = KPipeline(lang_code=lang_code, repo_id=KOKORO_REPO_ID, model=self.model)
         return self._pipelines[lang_code]
 
-    def narrate_to_mp3(self, text: str, *, voice: str, output_path: Path, speed: float = 0.95) -> float:
+    def narrate_to_mp3(
+        self,
+        text: str,
+        *,
+        voice: str,
+        output_path: Path,
+        speed: float = 0.95,
+        should_stop: "Callable[[], bool] | None" = None,
+    ) -> float:
         """Synthesize `text` with `voice` into `output_path`. Returns duration in seconds."""
         lang_code = voice[0]
         pipeline = self.pipeline(lang_code)
@@ -149,6 +162,8 @@ class KokoroEngine:
         try:
             produced = False
             for idx, paragraph in enumerate(paragraphs):
+                if should_stop is not None and should_stop():
+                    raise NarrationStopped()
                 if idx:
                     writer.silence(PARAGRAPH_PAUSE_SECONDS)
                 first_line = True

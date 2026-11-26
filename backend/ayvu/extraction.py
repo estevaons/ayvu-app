@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-CHAPTER_HEADER_PATTERN = re.compile(r"(?im)^(?:cap[ií]tulo|chapter)\s+[\wivxlcdm\d]+(?:\s*[-–:]\s*.*)?$")
+CHAPTER_HEADER_PATTERN = re.compile(
+    r"(?im)^(?:(?:cap[ií]tulo|chapter)\s+(?P<num>[\w\d]+)|pr[oó]logo|ep[ií]logo|prologue|epilogue)"
+    r"(?:\s*[-–—:.]\s*.*)?$"
+)
+# Um capítulo vira um arquivo de áudio. ~16 caracteres por segundo de narração a 64 kbps:
+# 50 mil caracteres dão ~50 min e ~24 MB, abaixo do limite de 50 MB por arquivo do Supabase.
+MAX_CHAPTER_CHARS = 50_000
 logger = logging.getLogger("ayvu.extraction")
 
 
@@ -74,6 +80,145 @@ def remove_repeated_page_lines(page_lines_list: list[list[str]]) -> list[list[st
     return cleaned_pages
 
 
+def unspace_letter_spaced_line(line: str) -> str:
+    """Join headings printed letter by letter ("C a p í t u l o  1 0" -> "Capítulo 10").
+
+    Words are separated by two or more spaces; a single space separates letters.
+    """
+    tokens = [t for t in line.strip().split(" ") if t]
+    if len(tokens) < 4 or any(len(t) != 1 for t in tokens):
+        return line
+    words = [w.replace(" ", "") for w in re.split(r" {2,}", line.strip())]
+    joined = " ".join(w for w in words if w)
+    # "C a p í t u l o 1 2" (sem espaço duplo) vira "Capítulo12": separa o número.
+    return re.sub(r"(?i)^(cap[ií]tulo|chapter)(\d)", r"\1 \2", joined)
+
+
+_ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+
+
+def _chapter_number(token: str | None) -> int | None:
+    if not token:
+        return None
+    if token.isdigit():
+        return int(token)
+    low = token.lower()
+    if all(ch in _ROMAN for ch in low):
+        total = 0
+        for a, b in zip(low, low[1:] + " "):
+            total += -_ROMAN[a] if b != " " and _ROMAN[a] < _ROMAN[b] else _ROMAN[a]
+        return total
+    return None
+
+
+def _drop_out_of_order_headers(matches: list) -> list:
+    """Drop headings numbered higher than the next one: teasers and tables of contents
+    ("Capítulo 23 — ..." on the cover, before "Capítulo 1")."""
+    kept: list = []
+    for idx, match in enumerate(matches):
+        num = _chapter_number(match.groupdict().get("num"))
+        nxt = _chapter_number(matches[idx + 1].groupdict().get("num")) if idx + 1 < len(matches) else None
+        if num is not None and nxt is not None and num > nxt:
+            continue
+        kept.append(match)
+    return kept
+
+
+def _title_line_after(full_text: str, pos: int) -> str | None:
+    """Short line right after a bare heading ("Capítulo 1" / "Olho de Pato") is its title."""
+    for line in full_text[pos:].split("\n")[:3]:
+        line = line.strip()
+        if not line:
+            continue
+        if len(line) <= 80 and len(line.split()) <= 12 and not re.search(r"[.!?…:;,]$", line):
+            return line
+        return None
+    return None
+
+
+def split_long_chapters(chapters: list["ChapterPayload"], max_chars: int = MAX_CHAPTER_CHARS) -> list["ChapterPayload"]:
+    """Split chapters too long for one audio file at paragraph (or sentence) boundaries."""
+    result: list[ChapterPayload] = []
+    for chapter in chapters:
+        if len(chapter.text) <= max_chars:
+            result.append(chapter)
+            continue
+        pieces: list[str] = []
+        for paragraph in re.split(r"\n{2,}", chapter.text):
+            if len(paragraph) <= max_chars:
+                pieces.append(paragraph)
+            else:
+                pieces += re.split(r"(?<=[.!?…])\s+", paragraph)
+        parts: list[str] = []
+        current = ""
+        for piece in pieces:
+            while len(piece) > max_chars:  # frase gigante sem pontuação: corta no espaço
+                cut = piece.rfind(" ", 0, max_chars)
+                cut = cut if cut > 0 else max_chars
+                parts.append((current + "\n\n" + piece[:cut]).strip() if current else piece[:cut])
+                current, piece = "", piece[cut:].strip()
+            if current and len(current) + len(piece) + 2 > max_chars:
+                parts.append(current)
+                current = piece
+            else:
+                current = f"{current}\n\n{piece}" if current else piece
+        if current.strip():
+            parts.append(current)
+        total = len(parts)
+        for n, text in enumerate(parts, start=1):
+            title = chapter.title if n == 1 or not chapter.title else f"{chapter.title} ({n}/{total})"
+            result.append(ChapterPayload(title=title, text=text))
+        logger.info("Split long chapter title=%r chars=%d parts=%d", chapter.title, len(chapter.text), total)
+    return result
+
+
+_FOOTER_LINE = re.compile(r"^(?:(?:https?://|www\.)\S+)?\s*(?:\d+\s*/\s*\d+)?$")
+_DROP_CAP = re.compile(r"[A-ZÀ-ÖØ-Þ]")
+
+
+def clean_pdf_page_lines(lines: list[str]) -> list[str]:
+    """Drop browser print footers (URL + "2/302") and put drop caps back on the first word.
+
+    A drop cap comes out as a lone capital on the page's first line, while the chapter body
+    starts without it ("ontam" for "Contam"). A body starting with a capital means the
+    drop cap was a word of its own ("A Arena"). Title lines between heading and body are skipped.
+    """
+    lines = [line for line in lines if not (line and _FOOTER_LINE.fullmatch(line) and re.search(r"\d|/", line))]
+    if not lines or not _DROP_CAP.fullmatch(lines[0]):
+        return lines
+    for h, line in enumerate(lines[1:], start=1):
+        if CHAPTER_HEADER_PATTERN.match(line):
+            # Pula a(s) linha(s) de título (curtas, sem pontuação final) até a primeira do texto.
+            for j in range(h + 1, min(h + 5, len(lines))):
+                body = lines[j]
+                if body and body[0].isalpha() and (len(body) >= 50 or re.search(r"[.!?…:;\"”»]$", body)):
+                    # Minúscula: junta ou separa depois, com o texto todo (resolve_drop_caps).
+                    lines[j] = f"\x01{lines[0]}\x01{body}" if body[0].islower() else f"{lines[0]} {body}"
+                    return lines[1:]
+            break
+    return lines
+
+
+def resolve_drop_caps(text: str) -> str:
+    """Decide between "Contam" and "O sorvete" by which spelling the book itself uses."""
+    marks = list(re.finditer(r"\x01(\w)\x01(\w*)", text))
+    if not marks:
+        return text
+    counts: dict[str, int] = {}
+    for word in re.findall(r"\w+", text.replace("\x01", " ").casefold()):
+        counts[word] = counts.get(word, 0) + 1
+
+    def fix(m: re.Match) -> str:
+        letter, rest = m.group(1), m.group(2)
+        joined = counts.get((letter + rest).casefold(), 0)
+        # Só letras que existem como palavra sozinha podem ficar separadas ("O sorvete", "I said").
+        alone = letter.upper() in "AOEÉÈÊÀYI"
+        split = counts.get(rest.casefold(), 0) if alone and len(rest) > 1 else 0
+        return f"{letter} {rest}" if split > joined else letter + rest
+
+    return re.sub(r"\x01(\w)\x01(\w*)", fix, text)
+
+
 def _extract_pdf_chapter_title(header_line: str) -> str:
     """Return subtitle after delimiter, or the full header line.
 
@@ -81,7 +226,7 @@ def _extract_pdf_chapter_title(header_line: str) -> str:
     Internal hyphens in spelled-out numbers (e.g. CHAPTER TWENTY-TWO) are not delimiters.
     """
     cleaned = header_line.strip()
-    sep_match = re.search(r":|\s+-\s+|\s+–\s+|\s+—\s+", cleaned)
+    sep_match = re.search(r":|\s+-\s+|\s+–\s+|\s*—\s*", cleaned)
     if sep_match:
         title_part = cleaned[sep_match.end() :].strip()
         if title_part:
@@ -90,7 +235,7 @@ def _extract_pdf_chapter_title(header_line: str) -> str:
 
 
 def split_pdf_text_into_chapters(full_text: str) -> list[tuple[str | None, str]]:
-    matches = list(CHAPTER_HEADER_PATTERN.finditer(full_text))
+    matches = _drop_out_of_order_headers(list(CHAPTER_HEADER_PATTERN.finditer(full_text)))
     if not matches:
         return [(None, full_text)]
     chapters: list[tuple[str | None, str]] = []
@@ -100,6 +245,8 @@ def split_pdf_text_into_chapters(full_text: str) -> list[tuple[str | None, str]]
         chapter_text = full_text[start:end].strip()
         if len(chapter_text.split()) > 50:
             title = _extract_pdf_chapter_title(match.group(0))
+            if title == match.group(0).strip():
+                title = _title_line_after(full_text, match.end()) or title
             chapters.append((title, chapter_text))
     return chapters or [(None, full_text)]
 
@@ -112,10 +259,11 @@ def extract_chapters_from_pdf(pdf_path: str) -> list[ChapterPayload]:
     pages_lines: list[list[str]] = []
     for page in reader.pages:
         raw_text = (page.extract_text() or "").replace("\r", "\n")
-        pages_lines.append([line.strip() for line in raw_text.split("\n")])
+        lines = [unspace_letter_spaced_line(line.strip()) for line in raw_text.split("\n")]
+        pages_lines.append(clean_pdf_page_lines(lines))
     cleaned_pages = remove_repeated_page_lines(pages_lines)
     full_text = "\n\n".join("\n".join(lines) for lines in cleaned_pages).strip()
-    full_text = normalize_text_whitespace(full_text)
+    full_text = resolve_drop_caps(normalize_text_whitespace(full_text))
     raw_chapters = split_pdf_text_into_chapters(full_text)
     result: list[ChapterPayload] = []
     for title, body in raw_chapters:

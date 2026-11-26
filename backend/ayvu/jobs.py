@@ -5,11 +5,17 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 
-from ayvu.extraction import SUPPORTED_EBOOK_EXTENSIONS, extract_chapters_from_ebook, sanitize_text_content
+from ayvu.extraction import (
+    SUPPORTED_EBOOK_EXTENSIONS,
+    extract_chapters_from_ebook,
+    sanitize_text_content,
+    split_long_chapters,
+)
 from ayvu.language import (
     BookLanguageError,
     detect_supported_book_language,
@@ -17,6 +23,7 @@ from ayvu.language import (
     resolve_voice,
     supported_language_names,
 )
+from ayvu.tts import NarrationStopped
 
 logger = logging.getLogger("ayvu.jobs")
 
@@ -97,6 +104,7 @@ def prepare_book(book_id: str, *, use_metadata_title: bool = False) -> bool:
             meta = read_metadata(str(src))
 
         chapters = [c for c in chapters if sanitize_text_content(c.text).strip()]
+        chapters = split_long_chapters(chapters)
         if not chapters:
             raise PrepareError("no_text", "No readable text was found in this file. Scanned PDFs are not supported yet.")
 
@@ -227,9 +235,21 @@ def generate_chapter(engine, chapter: dict) -> None:
         if not text_rows:
             raise ValueError("Chapter text is missing.")
         voice = book.get("voice") or resolve_voice(book.get("language_code") or "en", None)
+        checked = [time.monotonic()]
+
+        def should_stop() -> bool:
+            # Livro apagado ou cancelado no meio: libera a GPU em vez de narrar até o fim.
+            if time.monotonic() - checked[0] < 20:
+                return False
+            checked[0] = time.monotonic()
+            current = get_book(book["id"])
+            return current is None or current["status"] == "cancelled"
+
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "chapter.mp3"
-            duration = engine.narrate_to_mp3(text_rows[0]["content"], voice=voice, output_path=out)
+            duration = engine.narrate_to_mp3(
+                text_rows[0]["content"], voice=voice, output_path=out, should_stop=should_stop
+            )
             size = out.stat().st_size
             path = audio_path(book["user_id"], book["id"], chapter["chapter_index"])
             db.storage.from_("audio").upload(
@@ -245,6 +265,9 @@ def generate_chapter(engine, chapter: dict) -> None:
             "last_error": None,
         }).eq("id", chapter["id"]).execute()
         logger.info("Chapter done book=%s idx=%d duration=%.0fs", book["id"], chapter["chapter_index"], duration)
+    except NarrationStopped:
+        logger.info("Chapter stopped: book cancelled or deleted book=%s", book["id"])
+        db.table("chapters").update({"status": "cancelled", "locked_at": None}).eq("id", chapter["id"]).execute()
     except BookLanguageError as exc:
         fail_chapter(chapter, str(exc), retryable=False)
     except ValueError as exc:
