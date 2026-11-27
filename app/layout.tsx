@@ -10,7 +10,14 @@ export const metadata: Metadata = {
   title: "Ayvu — seus livros em voz alta",
   description: "Transforme PDFs e ebooks em audiolivros com vozes naturais.",
   applicationName: "Ayvu",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {

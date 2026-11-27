@@ -1,10 +1,10 @@
 // Modo offline: guarda as telas do app para ele abrir sem internet e tocar os livros baixados.
 // Registrado também no APK, que carrega o site publicado (ver components/Providers.tsx).
-const CACHE = "ayvu-v1";
+const CACHE = "ayvu-v2";
 
 // Caminhos estáveis, sem hash no nome. Uma falha aqui não pode derrubar a instalação.
 // Na Vercel a página offline responde em /offline/ (sem .html); no next dev, em /offline.html.
-const ROUTES = ["/", "/library/", "/book/", "/add/", "/settings/", "/login/", "/offline/", "/offline.html", "/icon.svg"];
+const ROUTES = ["/", "/library/", "/book/", "/add/", "/settings/", "/login/", "/offline/", "/offline.html", "/icon-192.png", "/favicon.ico"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {

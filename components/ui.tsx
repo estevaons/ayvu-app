@@ -1,6 +1,5 @@
 "use client";
 
-import { AudioLines } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { usePrefs } from "@/lib/prefs";
@@ -9,10 +8,9 @@ import type { BookStatus } from "@/lib/types";
 export function Logo({ className = "" }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 font-serif text-xl font-semibold tracking-tight ${className}`}>
-      <span className="grid size-8 place-items-center rounded-xl bg-accent text-accent-ink">
-        <AudioLines className="size-4.5" strokeWidth={2.4} />
-      </span>
-      ayvu
+      {/* eslint-disable-next-line @next/next/no-img-element -- export estático, sem otimizador de imagens */}
+      <img src="/icon-192.png" alt="" width={32} height={32} className="size-8 rounded-[10px] ring-1 ring-line" />
+      Ayvu
     </span>
   );
 }
