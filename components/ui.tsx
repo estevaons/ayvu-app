@@ -15,6 +15,20 @@ export function Logo({ className = "" }: { className?: string }) {
   );
 }
 
+/**
+ * Tela de abertura enquanto a sessão carrega. Copia o splash nativo (mesmo fundo, coruja do
+ * mesmo tamanho no centro) para a troca splash → app não piscar, em qualquer tema.
+ */
+export function SplashView() {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f0e0c]" role="status" aria-label="Ayvu">
+      {/* eslint-disable-next-line @next/next/no-img-element -- export estático, sem otimizador de imagens */}
+      <img src="/owl.png" alt="" width={136} height={161} className="w-[136px]" />
+      <Spinner className="absolute bottom-[calc(14%+env(safe-area-inset-bottom))] size-5 text-[#e0ad5f]/50" />
+    </div>
+  );
+}
+
 export function Spinner({ className = "size-5" }: { className?: string }) {
   return (
     <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden>

@@ -72,6 +72,8 @@ def main() -> None:
     place(owl, (512, 512), 0.56).save(pub / "icon-maskable-512.png", optimize=True)
     place(owl, (180, 180), 0.70).convert("RGB").save(pub / "apple-touch-icon.png", optimize=True)
     place(owl, (256, 256), 0.80).save(pub / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+    # Tela de abertura do app (components/ui.tsx SplashView), sempre sobre o fundo escuro.
+    owl.resize((320, round(owl.height * 320 / owl.width)), Image.LANCZOS).save(pub / "owl.png", optimize=True)
 
     # Android: ícone legado (quadrado arredondado e redondo) e adaptativo (108dp, área segura 66dp).
     for name, k in DENSITIES.items():
@@ -80,6 +82,11 @@ def main() -> None:
         mask(place(owl, (legacy, legacy), 0.72), "rounded").save(folder / "ic_launcher.png", optimize=True)
         mask(place(owl, (legacy, legacy), 0.64), "circle").save(folder / "ic_launcher_round.png", optimize=True)
         place(owl, (adaptive, adaptive), 0.54, bg=None).save(folder / "ic_launcher_foreground.png", optimize=True)
+        # Ícones temáticos (Android 13+): o sistema usa só o alfa e pinta com a cor do tema.
+        mono = place(owl, (adaptive, adaptive), 0.54, bg=None)
+        Image.merge("RGBA", (*[Image.new("L", mono.size, 255)] * 3, mono.getchannel("A"))).save(
+            folder / "ic_launcher_monochrome.png", optimize=True
+        )
 
     # Splash do Capacitor (Android < 12): imagem de tela cheia com a coruja no centro.
     for splash in RES.glob("drawable*/splash.png"):

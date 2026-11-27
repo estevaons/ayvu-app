@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { usePlayer } from "@/lib/player";
 import { usePrefs } from "@/lib/prefs";
 import { MiniPlayer } from "./Player";
-import { Logo, Spinner } from "./ui";
+import { SplashView } from "./ui";
 
 const TABS = [
   { href: "/library/", icon: LibraryBig, key: "nav.library" },
@@ -29,14 +29,7 @@ export function AppShell({ children, hideTabs = false }: { children: React.React
   }, [ready, user, router]);
 
   if (!ready || !user) {
-    return (
-      <div className="grid min-h-dvh place-items-center">
-        <div className="flex flex-col items-center gap-5 text-muted">
-          <Logo />
-          <Spinner />
-        </div>
-      </div>
-    );
+    return <SplashView />;
   }
 
   const bottomSpace = (player.book ? 76 : 0) + (hideTabs ? 16 : 72);
