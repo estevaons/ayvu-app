@@ -33,6 +33,8 @@ const ptBR = {
   "auth.weak": "Escolha uma senha mais forte (8+ caracteres).",
   "auth.notConfirmed": "Confirme seu e-mail antes de entrar.",
   "auth.generic": "Não foi possível entrar agora. Tente de novo.",
+  "auth.google": "Continuar com Google",
+  "auth.or": "ou",
 
   "library.title": "Biblioteca",
   "library.greeting.morning": "Bom dia",
@@ -198,6 +200,8 @@ const en: Record<DictKey, string> = {
   "auth.weak": "Choose a stronger password (8+ characters).",
   "auth.notConfirmed": "Confirm your email before signing in.",
   "auth.generic": "Couldn't sign in right now. Try again.",
+  "auth.google": "Continue with Google",
+  "auth.or": "or",
 
   "library.title": "Library",
   "library.greeting.morning": "Good morning",
