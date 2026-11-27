@@ -2,6 +2,7 @@
 
 import { AudioLines } from "lucide-react";
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { usePrefs } from "@/lib/prefs";
 import type { BookStatus } from "@/lib/types";
 
@@ -71,11 +72,19 @@ export function Sheet({
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Trava o scroll da página por trás enquanto o sheet está aberto.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!open || typeof document === "undefined") return null;
+  // Portal no body: ancestrais com transform (ex.: animate-fade-up) viram containing block
+  // de elementos fixed, e o sheet acabaria preso ao fim da página em vez da viewport.
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" role="dialog" aria-modal>
       <button aria-label="Close" className="absolute inset-0 animate-fade bg-scrim backdrop-blur-[2px]" onClick={onClose} />
       <div className="relative max-h-[85dvh] w-full animate-sheet-up overflow-y-auto rounded-t-[28px] border border-line bg-surface p-5 pb-safe shadow-soft sm:max-w-md sm:animate-fade-up sm:rounded-[28px]">
@@ -83,7 +92,8 @@ export function Sheet({
         {title && <h2 className="mb-4 font-serif text-xl">{title}</h2>}
         <div className="pb-3">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
