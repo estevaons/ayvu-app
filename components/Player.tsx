@@ -1,10 +1,7 @@
 "use client";
 
 import {
-  BookOpenText,
   ChevronDown,
-  Gauge,
-  Image as ImageIcon,
   ListMusic,
   Loader2,
   Moon,
@@ -12,8 +9,6 @@ import {
   Play,
   RotateCcw,
   RotateCw,
-  SkipBack,
-  SkipForward,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -143,7 +138,22 @@ export function PlayerSheet() {
         <button className="icon-btn" onClick={() => p.setExpanded(false)} aria-label={t("player.minimize")}>
           <ChevronDown className="size-6" />
         </button>
-        <span className="eyebrow">{t("player.nowPlaying")}</span>
+        {script !== null && p.chapter && !p.waitingNext && !p.error ? (
+          <div className="flex rounded-full bg-elevated p-0.5 text-[13px] font-medium" role="group">
+            {([false, true] as const).map((text) => (
+              <button
+                key={String(text)}
+                className={`h-8 rounded-full px-4 transition ${showText === text ? "bg-bg text-ink shadow-soft" : "text-muted hover:text-ink"}`}
+                aria-pressed={showText === text}
+                onClick={() => setPrefs({ readAlong: text })}
+              >
+                {text ? t("player.showText") : t("player.showCover")}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="eyebrow">{t("player.nowPlaying")}</span>
+        )}
         <button className="icon-btn" onClick={p.close} aria-label={t("common.close")}>
           <X className="size-5" />
         </button>
@@ -155,38 +165,34 @@ export function PlayerSheet() {
         className={`relative mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 py-3 sm:gap-7 sm:px-7 ${showText ? "max-w-xl" : "max-w-md justify-center overflow-y-auto"}`}
       >
         {showText ? (
-          <>
-            <ReadAlong key={p.chapter!.id} script={script} />
-            <div className="flex items-center gap-3">
-              <Cover title={p.book.title} coverPath={p.book.cover_path} size="sm" className="w-11 shrink-0 rounded-md" />
-              <div className="min-w-0">
-                <h2 className="truncate font-serif text-lg leading-tight">{label(p.chapter)}</h2>
-                <p className="truncate text-sm text-muted">
-                  {p.book.title}
-                  {p.book.author ? ` · ${p.book.author}` : ""}
-                </p>
-              </div>
-            </div>
-          </>
+          <ReadAlong key={p.chapter!.id} script={script} />
         ) : (
-          <>
-            <Cover
-              title={p.book.title}
-              author={p.book.author}
-              coverPath={p.book.cover_path}
-              size="lg"
-              className="mx-auto w-[max(96px,min(68vw,300px,calc((100dvh_-_440px)/1.5)))] shrink-0 rounded-2xl"
-            />
-
-            <div className="text-center">
-              <h2 className="line-clamp-2 font-serif text-2xl leading-tight">{label(p.chapter)}</h2>
-              <p className="mt-1 truncate text-sm text-muted">
-                {p.book.title}
-                {p.book.author ? ` · ${p.book.author}` : ""}
-              </p>
-            </div>
-          </>
+          <Cover
+            title={p.book.title}
+            author={p.book.author}
+            coverPath={p.book.cover_path}
+            size="lg"
+            className="mx-auto w-[max(96px,min(68vw,300px,calc((100dvh_-_400px)/1.5)))] shrink-0 rounded-2xl"
+          />
         )}
+
+        <button
+          className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-1.5 text-left transition hover:bg-elevated"
+          onClick={() => setPanel("chapters")}
+          aria-label={t("player.chapters")}
+        >
+          {showText && (
+            <Cover title={p.book.title} coverPath={p.book.cover_path} size="sm" className="w-11 shrink-0 rounded-md" />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate font-serif leading-tight ${showText ? "text-lg" : "text-2xl"}`}>{label(p.chapter)}</span>
+            <span className="mt-0.5 block truncate text-sm text-muted">
+              {idx >= 0 ? `${t("player.chapterOf", { index: idx + 1, total: p.chapters.length })} · ` : ""}
+              {p.book.title}
+            </span>
+          </span>
+          <ListMusic className="size-5 shrink-0 text-muted" />
+        </button>
 
         {p.waitingNext ? (
           <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4 text-sm text-ink">
@@ -224,8 +230,12 @@ export function PlayerSheet() {
         )}
 
         <div className="flex items-center justify-between">
-          <button className="icon-btn size-12" onClick={p.prev} aria-label={t("player.prev")} disabled={idx <= 0 && p.position < 5}>
-            <SkipBack className="size-6 fill-current" />
+          <button
+            className={`icon-btn h-12 w-14 text-[15px] font-semibold tabular-nums ${p.rate !== 1 ? "text-accent" : "text-muted"}`}
+            onClick={() => setPanel("speed")}
+            aria-label={`${t("player.speed")}: ${p.rate}×`}
+          >
+            {p.rate}×
           </button>
           <button className="icon-btn relative size-14" onClick={() => p.seekBy(-15)} aria-label={t("player.back15")}>
             <RotateCcw className="size-8" strokeWidth={1.6} />
@@ -250,38 +260,16 @@ export function PlayerSheet() {
             <span className="absolute text-[10px] font-bold">30</span>
           </button>
           <button
-            className="icon-btn size-12"
-            onClick={p.next}
-            aria-label={t("player.next")}
-            disabled={idx === -1 || idx >= p.chapters.length - 1}
-          >
-            <SkipForward className="size-6 fill-current" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-4 gap-2">
-          <button className="btn-ghost h-12 flex-col gap-0.5 text-xs font-medium" onClick={() => setPanel("speed")}>
-            <Gauge className="size-4.5" />
-            {p.rate}×
-          </button>
-          <button
-            className={`btn-ghost h-12 flex-col gap-0.5 text-xs font-medium ${p.sleep.mode !== "off" ? "text-accent" : ""}`}
+            className={`icon-btn h-12 w-14 flex-col gap-0.5 ${p.sleep.mode !== "off" ? "text-accent" : "text-muted"}`}
             onClick={() => setPanel("sleep")}
+            aria-label={sleepLabel(p.sleep, t, now)}
           >
-            <Moon className="size-4.5" />
-            <span className="tabular-nums">{sleepLabel(p.sleep, t, now)}</span>
-          </button>
-          <button className="btn-ghost h-12 flex-col gap-0.5 text-xs font-medium" onClick={() => setPanel("chapters")}>
-            <ListMusic className="size-4.5" />
-            {idx >= 0 ? `${idx + 1}/${p.chapters.length}` : t("player.chapters")}
-          </button>
-          <button
-            className={`btn-ghost h-12 flex-col gap-0.5 text-xs font-medium ${showText ? "text-accent" : ""}`}
-            onClick={() => setPrefs({ readAlong: !readAlong })}
-            disabled={script === null}
-          >
-            {showText ? <ImageIcon className="size-4.5" /> : <BookOpenText className="size-4.5" />}
-            {showText ? t("player.showCover") : t("player.showText")}
+            <Moon className="size-5" />
+            {p.sleep.mode !== "off" && (
+              <span className="text-[10px] font-semibold tabular-nums">
+                {p.sleep.mode === "time" ? sleepLabel(p.sleep, t, now) : t("player.sleepEndShort")}
+              </span>
+            )}
           </button>
         </div>
       </div>
