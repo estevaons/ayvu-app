@@ -247,8 +247,9 @@ def generate_chapter(engine, chapter: dict) -> None:
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "chapter.mp3"
+            timings: list[list[list]] = []
             duration = engine.narrate_to_mp3(
-                text_rows[0]["content"], voice=voice, output_path=out, should_stop=should_stop
+                text_rows[0]["content"], voice=voice, output_path=out, should_stop=should_stop, timings=timings
             )
             size = out.stat().st_size
             path = audio_path(book["user_id"], book["id"], chapter["chapter_index"])
@@ -256,6 +257,12 @@ def generate_chapter(engine, chapter: dict) -> None:
                 path, out.read_bytes(),
                 {"content-type": "audio/mpeg", "cache-control": "31536000", "upsert": "true"},
             )
+        # Marcas de tempo por trecho falado: o app mostra o texto aparecendo junto com o áudio.
+        # Falhar aqui não pode perder o áudio já gerado: sem as marcas, o app estima o tempo.
+        try:
+            db.table("chapter_texts").update({"timings": timings}).eq("chapter_id", chapter["id"]).execute()
+        except Exception:
+            logger.warning("Could not save timings chapter=%s", chapter["id"], exc_info=True)
         db.table("chapters").update({
             "status": "completed",
             "audio_path": path,
@@ -286,3 +293,45 @@ def queue_stats() -> tuple[int, int]:
 
 def reset_stale_chapters(minutes: int = 20) -> int:
     return int(supabase().rpc("reset_stale_chapters", {"p_stale_minutes": minutes}).execute().data or 0)
+
+
+def backfill_timings(limit: int = 1000) -> dict:
+    """Timings for chapters narrated before the worker recorded them, found in their audio.
+
+    A chapter that can't be aligned gets `[]`, so it isn't tried again (the app estimates)."""
+    from ayvu.align import decode_mp3, find_silences, timings_from_silences
+
+    db = supabase()
+    done = failed = 0
+    while done + failed < limit:
+        rows = (
+            db.table("chapter_texts")
+            .select("chapter_id,content,chapters!inner(status,audio_path,duration_seconds,books!inner(voice))")
+            .is_("timings", "null")
+            .eq("chapters.status", "completed")
+            .limit(min(10, limit - done - failed))
+            .execute()
+            .data
+        )
+        if not rows:
+            break
+        for row in rows:
+            chapter = row["chapters"]
+            timings: list = []
+            try:
+                voice = (chapter.get("books") or {}).get("voice") or "a"
+                with tempfile.TemporaryDirectory() as tmp:
+                    path = Path(tmp) / "chapter.mp3"
+                    path.write_bytes(db.storage.from_("audio").download(chapter["audio_path"]))
+                    pcm = decode_mp3(path)
+                duration = float(chapter.get("duration_seconds") or 0) or len(pcm) / 8000
+                timings = timings_from_silences(
+                    row["content"], espeak=voice[0] not in ("a", "b"), duration=duration, silences=find_silences(pcm)
+                )
+                done += 1
+            except Exception:
+                logger.exception("Could not align chapter=%s", row["chapter_id"])
+                failed += 1
+            db.table("chapter_texts").update({"timings": timings}).eq("chapter_id", row["chapter_id"]).execute()
+            logger.info("Timings chapter=%s paragraphs=%d", row["chapter_id"], len(timings))
+    return {"aligned": done, "failed": failed}

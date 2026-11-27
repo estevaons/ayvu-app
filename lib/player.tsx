@@ -38,6 +38,8 @@ interface PlayerContext extends PlayerState {
   setSleep: (sleep: SleepTimer) => void;
   setExpanded: (expanded: boolean) => void;
   close: () => void;
+  /** Exact playback position, read straight from the audio element (for per-frame UI). */
+  currentTime: () => number;
 }
 
 const Ctx = createContext<PlayerContext | null>(null);
@@ -427,6 +429,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setSleep,
       setExpanded,
       close,
+      currentTime: () => audioRef.current?.currentTime ?? 0,
     }),
     [bookId, book, chapters, chapter, playing, loading, error, waitingNext, position, duration, rate, sleep, expanded, playBook, toggle, seekBy, seekTo, goToChapter, setRate, close],
   );

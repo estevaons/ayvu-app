@@ -1,7 +1,8 @@
 "use client";
 
 import { Capacitor } from "@capacitor/core";
-import { Directory, Filesystem } from "@capacitor/filesystem";
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { fetchChapterText, type ChapterTextRow } from "./chapterText";
 import { isNative, kv } from "./platform";
 import { signedUrl } from "./supabase";
 import type { Chapter } from "./types";
@@ -72,8 +73,50 @@ export async function downloadChapter(chapter: Chapter): Promise<void> {
     const cache = await caches.open(CACHE_NAME);
     await cache.put(cacheKey(chapter.id), response);
   }
+  await saveText(chapter).catch(() => {}); // the audio still works offline without it
   const index = await readIndex();
   await writeIndex({ ...index, [chapter.id]: entry });
+}
+
+const textPath = (bookId: string, chapterIndex: number) => `text/${bookId}/${chapterIndex}.json`;
+const textCacheKey = (chapterId: string) => `/offline-text/${chapterId}.json`;
+
+async function saveText(chapter: Chapter) {
+  const row = await fetchChapterText(chapter.id);
+  if (!row) return;
+  const json = JSON.stringify(row);
+  if (isNative()) {
+    await Filesystem.writeFile({
+      path: textPath(chapter.book_id, chapter.chapter_index),
+      data: json,
+      directory: Directory.Data,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    });
+  } else {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(textCacheKey(chapter.id), new Response(json, { headers: { "Content-Type": "application/json" } }));
+  }
+}
+
+/** The chapter text saved with its offline download, if any. */
+export async function offlineChapterText(chapter: Chapter): Promise<ChapterTextRow | null> {
+  const entry = (await readIndex())[chapter.id];
+  if (!entry || entry.size !== chapter.size_bytes) return null;
+  try {
+    if (isNative()) {
+      const res = await Filesystem.readFile({
+        path: textPath(chapter.book_id, chapter.chapter_index),
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      return JSON.parse(res.data as string) as ChapterTextRow;
+    }
+    const hit = await (await caches.open(CACHE_NAME)).match(textCacheKey(chapter.id));
+    return hit ? ((await hit.json()) as ChapterTextRow) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function downloadBook(chapters: Chapter[], onProgress?: (done: number, total: number) => void) {
@@ -109,8 +152,11 @@ async function removeFile(chapterId: string, entry: OfflineEntry) {
   try {
     if (isNative()) {
       await Filesystem.deleteFile({ path: `audio/${entry.bookId}/${entry.chapterIndex}.mp3`, directory: Directory.Data });
+      await Filesystem.deleteFile({ path: textPath(entry.bookId, entry.chapterIndex), directory: Directory.Data }).catch(() => {});
     } else {
-      await (await caches.open(CACHE_NAME)).delete(cacheKey(chapterId));
+      const cache = await caches.open(CACHE_NAME);
+      await cache.delete(cacheKey(chapterId));
+      await cache.delete(textCacheKey(chapterId));
     }
   } catch {
     /* already gone */

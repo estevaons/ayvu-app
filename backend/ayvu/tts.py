@@ -150,8 +150,13 @@ class KokoroEngine:
         output_path: Path,
         speed: float = 0.95,
         should_stop: "Callable[[], bool] | None" = None,
+        timings: "list[list[list]] | None" = None,
     ) -> float:
-        """Synthesize `text` with `voice` into `output_path`. Returns duration in seconds."""
+        """Synthesize `text` with `voice` into `output_path`. Returns duration in seconds.
+
+        If `timings` is given, it is filled with one list per paragraph of
+        `[start_seconds, end_seconds, spoken_text]` segments, so the app can show the
+        text in sync with the audio."""
         lang_code = voice[0]
         pipeline = self.pipeline(lang_code)
         paragraphs = paragraphs_for_narration(text, espeak=lang_code not in ("a", "b"))
@@ -167,17 +172,26 @@ class KokoroEngine:
                 if idx:
                     writer.silence(PARAGRAPH_PAUSE_SECONDS)
                 first_line = True
+                segments: list[list] = []
                 for result in pipeline(paragraph, voice=voice, speed=speed, split_pattern=r"\n+"):
                     audio = getattr(result, "audio", None)
-                    if audio is None and isinstance(result, tuple):
-                        audio = result[2]
+                    graphemes = getattr(result, "graphemes", None)
+                    if isinstance(result, tuple):
+                        graphemes = graphemes if graphemes is not None else result[0]
+                        audio = audio if audio is not None else result[2]
                     if audio is None:
                         continue
                     if not first_line:
                         writer.silence(LINE_PAUSE_SECONDS)
+                    start = writer.samples / SAMPLE_RATE
                     writer.write(audio)
+                    spoken = re.sub(r"\s+", " ", str(graphemes or "")).strip()
+                    if spoken:
+                        segments.append([round(start, 3), round(writer.samples / SAMPLE_RATE, 3), spoken])
                     first_line = False
                     produced = True
+                if timings is not None and segments:
+                    timings.append(segments)
             if not produced:
                 raise RuntimeError("Kokoro produced no audio for this chapter.")
             duration = writer.close()

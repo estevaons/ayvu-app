@@ -12,9 +12,11 @@ export interface Prefs {
   theme: Theme;
   defaultRate: number;
   autoplay: boolean;
+  /** Show the chapter text being written along with the narration in the full player. */
+  readAlong: boolean;
 }
 
-const DEFAULTS: Prefs = { locale: "pt-BR", theme: "system", defaultRate: 1, autoplay: true };
+const DEFAULTS: Prefs = { locale: "pt-BR", theme: "system", defaultRate: 1, autoplay: true, readAlong: true };
 const KEY = "ayvu.prefs";
 
 interface PrefsContext extends Prefs {

@@ -196,6 +196,26 @@ input[type="range"].scrubber::-moz-range-thumb {
   background: var(--ink);
 }
 
+/* Player read-along: the whole chapter text, dim, lights up as it is narrated.
+   Deliberately plain: mask-image, gradient overlays or color transitions over this scroller
+   made Chrome (Intel/Mesa GPU) leave stale copies of the text or darken the whole area. */
+.read-along {
+  scrollbar-width: none;
+}
+.read-along::-webkit-scrollbar { display: none; }
+.read-along-passage {
+  cursor: pointer;
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+@media (hover: hover) {
+  .read-along-passage:hover { background: var(--accent-soft); }
+}
+.read-along-passage:active { background: var(--accent-soft); }
+.read-along-lit { color: var(--ink); }
+.read-along-dim { color: var(--faint); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

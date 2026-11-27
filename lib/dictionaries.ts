@@ -133,6 +133,10 @@ const ptBR = {
   "player.waitingNext": "O próximo capítulo ainda está sendo gerado. Ele começa sozinho quando ficar pronto.",
   "player.loadError": "Não foi possível carregar o áudio.",
   "player.minimize": "Minimizar",
+  "player.showText": "Texto",
+  "player.showCover": "Capa",
+  "player.follow": "Voltar ao trecho atual",
+  "player.seekHere": "Ouvir a partir daqui",
 
   "settings.title": "Ajustes",
   "settings.account": "Conta",
@@ -292,6 +296,10 @@ const en: Record<DictKey, string> = {
   "player.waitingNext": "The next chapter is still being generated. It will start on its own when ready.",
   "player.loadError": "Couldn't load the audio.",
   "player.minimize": "Minimize",
+  "player.showText": "Text",
+  "player.showCover": "Cover",
+  "player.follow": "Back to current line",
+  "player.seekHere": "Listen from here",
 
   "settings.title": "Settings",
   "settings.account": "Account",

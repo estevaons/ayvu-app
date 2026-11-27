@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  BookOpenText,
   ChevronDown,
   Gauge,
+  Image as ImageIcon,
   ListMusic,
   Loader2,
   Moon,
@@ -19,6 +21,7 @@ import { clock } from "@/lib/format";
 import { RATES, usePlayer, type SleepTimer } from "@/lib/player";
 import { usePrefs } from "@/lib/prefs";
 import { Cover } from "./Cover";
+import { ReadAlong, useChapterScript } from "./ReadAlong";
 import { Sheet } from "./ui";
 
 function useChapterLabel() {
@@ -87,7 +90,8 @@ function sleepLabel(sleep: SleepTimer, t: ReturnType<typeof usePrefs>["t"], now:
 
 export function PlayerSheet() {
   const p = usePlayer();
-  const { t } = usePrefs();
+  const { t, readAlong, set: setPrefs } = usePrefs();
+  const script = useChapterScript(p.chapter, p.duration || p.chapter?.duration_seconds || 0);
   const label = useChapterLabel();
   const [panel, setPanel] = useState<null | "speed" | "sleep" | "chapters">(null);
   const [scrub, setScrub] = useState<number | null>(null);
@@ -125,6 +129,8 @@ export function PlayerSheet() {
   const duration = p.duration || p.chapter?.duration_seconds || 0;
   const fill = duration ? (position / duration) * 100 : 0;
   const idx = p.chapters.findIndex((c) => c.chapter_index === p.chapter?.chapter_index);
+  // Text while it loads too (no cover flash); the cover when the chapter has no text.
+  const showText = readAlong && script !== null && !!p.chapter && !p.waitingNext && !p.error;
 
   return (
     <div className="fixed inset-0 z-[60] flex animate-sheet-up flex-col bg-bg pt-safe pb-safe">
@@ -145,22 +151,42 @@ export function PlayerSheet() {
 
       {/* A capa encolhe pela altura disponível (≈440px para o resto do player), para os controles
           caberem em celulares baixos; se ainda faltar espaço, a área rola em vez de cortar. */}
-      <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col justify-center gap-5 overflow-y-auto px-6 py-3 sm:gap-7 sm:px-7">
-        <Cover
-          title={p.book.title}
-          author={p.book.author}
-          coverPath={p.book.cover_path}
-          size="lg"
-          className="mx-auto w-[max(96px,min(68vw,300px,calc((100dvh_-_440px)/1.5)))] shrink-0 rounded-2xl"
-        />
+      <div
+        className={`relative mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 py-3 sm:gap-7 sm:px-7 ${showText ? "max-w-xl" : "max-w-md justify-center overflow-y-auto"}`}
+      >
+        {showText ? (
+          <>
+            <ReadAlong key={p.chapter!.id} script={script} />
+            <div className="flex items-center gap-3">
+              <Cover title={p.book.title} coverPath={p.book.cover_path} size="sm" className="w-11 shrink-0 rounded-md" />
+              <div className="min-w-0">
+                <h2 className="truncate font-serif text-lg leading-tight">{label(p.chapter)}</h2>
+                <p className="truncate text-sm text-muted">
+                  {p.book.title}
+                  {p.book.author ? ` · ${p.book.author}` : ""}
+                </p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <Cover
+              title={p.book.title}
+              author={p.book.author}
+              coverPath={p.book.cover_path}
+              size="lg"
+              className="mx-auto w-[max(96px,min(68vw,300px,calc((100dvh_-_440px)/1.5)))] shrink-0 rounded-2xl"
+            />
 
-        <div className="text-center">
-          <h2 className="line-clamp-2 font-serif text-2xl leading-tight">{label(p.chapter)}</h2>
-          <p className="mt-1 truncate text-sm text-muted">
-            {p.book.title}
-            {p.book.author ? ` · ${p.book.author}` : ""}
-          </p>
-        </div>
+            <div className="text-center">
+              <h2 className="line-clamp-2 font-serif text-2xl leading-tight">{label(p.chapter)}</h2>
+              <p className="mt-1 truncate text-sm text-muted">
+                {p.book.title}
+                {p.book.author ? ` · ${p.book.author}` : ""}
+              </p>
+            </div>
+          </>
+        )}
 
         {p.waitingNext ? (
           <div className="flex items-center gap-3 rounded-2xl bg-accent-soft p-4 text-sm text-ink">
@@ -233,7 +259,7 @@ export function PlayerSheet() {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <button className="btn-ghost h-12 flex-col gap-0.5 text-xs font-medium" onClick={() => setPanel("speed")}>
             <Gauge className="size-4.5" />
             {p.rate}×
@@ -248,6 +274,14 @@ export function PlayerSheet() {
           <button className="btn-ghost h-12 flex-col gap-0.5 text-xs font-medium" onClick={() => setPanel("chapters")}>
             <ListMusic className="size-4.5" />
             {idx >= 0 ? `${idx + 1}/${p.chapters.length}` : t("player.chapters")}
+          </button>
+          <button
+            className={`btn-ghost h-12 flex-col gap-0.5 text-xs font-medium ${showText ? "text-accent" : ""}`}
+            onClick={() => setPrefs({ readAlong: !readAlong })}
+            disabled={script === null}
+          >
+            {showText ? <ImageIcon className="size-4.5" /> : <BookOpenText className="size-4.5" />}
+            {showText ? t("player.showCover") : t("player.showText")}
           </button>
         </div>
       </div>

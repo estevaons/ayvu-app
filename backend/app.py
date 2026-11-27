@@ -7,6 +7,7 @@
 - `TTSWorker`  GPU job: drains the fair queue (round-robin across users) chapter by chapter.
 - `dispatch`   Wakes enough TTS workers for the queue; also runs on a schedule to recover
                stuck chapters and pick up retries whose back-off has elapsed.
+- `backfill_timings`  One-off: read-along timings for chapters narrated before they existed.
 """
 
 import os
@@ -43,6 +44,8 @@ base_image = (
     )
 )
 web_image = base_image.add_local_python_source("ayvu")
+# Reads narrated MP3s to find where each paragraph starts (chapters made before timings existed).
+align_image = base_image.apt_install("ffmpeg").pip_install("numpy").add_local_python_source("ayvu")
 
 tts_image = (
     base_image.apt_install("ffmpeg", "espeak-ng")
@@ -131,6 +134,17 @@ def dispatch() -> dict:
     for _ in range(wanted):
         TTSWorker().drain.spawn()
     return {"recovered": recovered, "pending": pending, "generating": generating, "in_flight": in_flight, "spawned": wanted}
+
+
+@app.function(image=align_image, secrets=secrets, timeout=3600, memory=2048)
+def backfill_timings(limit: int = 1000) -> dict:
+    """One-off: `modal run app.py::backfill_timings` gives old chapters read-along timings."""
+    import logging
+
+    from ayvu.jobs import backfill_timings as run
+
+    logging.basicConfig(level=logging.INFO)
+    return run(limit)
 
 
 # ---------------------------------------------------------------------------
